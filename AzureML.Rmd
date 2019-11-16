@@ -56,8 +56,7 @@ myPrediction<-function(SW=0){
 
 ### Publish a predict function
 ```{r echo=TRUE, eval=FALSE}
-response <- publishWebService("myPrediction", "myPredictionOnline",                              list("SW"="float"), list("r"="float"), 
-                              MLID, AuthToken)
+response <- publishWebService("myPrediction", "myPredictionOnline",  list("SW"="float"), list("r"="float"), MLID, AuthToken)
 ```
 
 

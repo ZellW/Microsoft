@@ -1,0 +1,111 @@
+Exec sp_configure  'external scripts enabled', 1  
+Reconfigure  with override    
+
+
+Exec sp_configure  'external scripts enabled'    
+
+exec sp_execute_external_script  @language =N'R',  
+@script=N'OutputDataSet<-InputDataSet',    
+@input_data_1 =N'select 1 as hello'  
+with result sets (([hello] int not null));  
+go
+
+EXECUTE sp_execute_external_script  @language = N'R'
+, @script = N'OutputDataSet <- data.frame(.libPaths());'
+WITH RESULT SETS (([DefaultLibraryName] VARCHAR(MAX) NOT NULL));
+GO
+
+
+ EXECUTE sp_execute_external_script @language=N'R' 
+ ,@script = N'str(OutputDataSet); packagematrix <- installed.packages(); 
+ NameOnly <- packagematrix[,1]; OutputDataSet <- as.data.frame(NameOnly);'
+  ,@input_data_1 = N'SELECT 1 as col' 
+  WITH RESULT SETS ((PackageName nvarchar(250) ))
+
+
+EXEC   sp_execute_external_script
+      @language = N'R'
+     ,@script = N'	d <- inputDataSet;
+				OutputDataset <- data.frame(cor(d$OrderQuantity,d$DiscountAmount))
+								'
+	,@input_data_1 = N' select [OrderQuantity],[DiscountAmount] from [dbo].[FactResellerSales]'
+	,@input_data_1_name = N'inputDataSet'
+	,@output_data_1_name = N'OutputDataset'
+WITH RESULT SETS (([col] float(20) NOT NULL));
+IF NOT EXISTS (SELECT 1 FROM sys.objects
+				WHERE	object_id = OBJECT_ID(N'[dbo].[cor]')
+					AND [type] IN (N'U'))
+BEGIN
+	CREATE TABLE [dbo].cor(
+		[plot] [float] NULL
+	);
+END
+
+Insert into cor
+EXEC   sp_execute_external_script
+      @language = N'R'
+     ,@script = N'	d <- inputDataSet;
+		OutputDataset <- data.frame(cor(d$OrderQuantity,d$DiscountAmount))					'
+	,@input_data_1 = N' select [OrderQuantity],[DiscountAmount] from [dbo].[FactResellerSales]'
+	,@input_data_1_name = N'inputDataSet'
+	,@output_data_1_name = N'OutputDataset'
+
+	SELECT * FROM dbo.cor;
+
+
+#****************creating histogram
+
+EXEC   sp_execute_external_script
+      @language = N'R'
+     ,@script = N'	df <- inputDataSet; #read input data
+				image_file = tempfile(); 
+				jpeg(filename = image_file, width=500, height=500); 
+				hist(df$Ages); 
+				dev.off();
+				OutputDataset <- data.frame(data=readBin(file(image_file,"rb"),what=raw(),n=1e6));
+				'
+	,@input_data_1 = N'SELECT Ages = DATEDIFF(YEAR,[BirthDate],GETDATE())
+						FROM [AdventureWorksDW2016CTP3].[dbo].[DimCustomer];'
+	,@input_data_1_name = N'inputDataSet'
+	,@output_data_1_name = N'OutputDataset'
+WITH RESULT SETS ((plot varbinary(max)));
+
+
+IF NOT EXISTS (SELECT 1 FROM sys.objects
+				WHERE	object_id = OBJECT_ID(N'[dbo].[Plots]')
+					AND [type] IN (N'U'))
+BEGIN
+	CREATE TABLE [dbo].[Plots](
+		[plot] [varbinary](MAX) NULL
+	);
+END
+
+Insert into Plots
+EXEC   sp_execute_external_script
+      @language = N'R'
+     ,@script = N'	df <- inputDataSet; 
+				image_file = tempfile(); 
+				jpeg(filename = image_file, width=500, height=500); 
+				hist(df$Ages); 
+				dev.off(); 
+				OutputDataset <- data.frame(data=readBin(file(image_file,"rb"),what=raw(),n=1e6));
+					'
+	,@input_data_1 = N'SELECT Ages = DATEDIFF(YEAR,[BirthDate],GETDATE())
+						FROM [AdventureWorksDW2016CTP3].[dbo].[DimCustomer];'
+	,@input_data_1_name = N'inputDataSet'
+	,@output_data_1_name = N'OutputDataset';
+
+
+	SELECT TOP 1 plot FROM dbo.Plots;
+
+*#****************************************
+-- Training the customer churn model for telco
+exec train_customer_churn_model;
+-- Finding the model
+select * from cdr_models
+where model_name = 'rxDForest'
+-- Evaluating the model
+exec model_evaluate
+-- Predicting customers that will churn
+exec predict_customer_churn 'rxDForest';
+#**************************************
