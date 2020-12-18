@@ -10,8 +10,9 @@ Compare the performance of GBM, xgboost and LightGBM
 Use Kaggle’s credit card fraud dataset:
 
 ```{r}
-# download from https://www.kaggle.com/dalpozz/creditcardfraud ~ nearly 150MB
-creditcard <- read.csv(file.choose())
+# download from https://www.kaggle.com/mlg-ulb/creditcardfraud ~ nearly 150MB
+#creditcard <- read.csv(file.choose())
+creditcard <- read.csv("../../LargeData/creditcardfraud.csv")
 ```
 
 ```{r}
@@ -22,12 +23,10 @@ library(microbenchmark, quietly=TRUE)
 set.seed(42)
 
 #Read in the data and split it into train/test subsets
-#credit.card.data = read.csv("../input/creditcard.csv")
-credit.card.data = creditcard
 
-train.test.split <- sample(2, nrow(credit.card.data), replace = TRUE, prob = c(0.7, 0.3))
-train = credit.card.data[train.test.split == 1,]
-test = credit.card.data[train.test.split == 2,]
+train.test.split <- sample(2, nrow(creditcard), replace = TRUE, prob = c(0.7, 0.3))
+train = creditcard[train.test.split == 1,]
+test = creditcard[train.test.split == 2,]
 ```
 
 ## Feature Creation
@@ -147,32 +146,8 @@ auc.xgb.acc
 
 ## lightGBM
 
-### Install lighGBM
-
-Install git for windows, cmake (3.8 or higher) and MS Build (MSbuild is not needed if Visual Studio is installed).
-
-Run following command in Git Shell (right process but still fails):
-
-Path to Rtools required:  https://stackoverflow.com/questions/8042136/install-r-package-from-source-without-changing-path-windows
-
-`git clone --recursive https://github.com/Microsoft/LightGBM`
-`cd LightGBM`
-`mkdir build`
-`cd build`
-`cmake -DCMAKE_GENERATOR_PLATFORM=x64 ..`
-`cmake --build . --target ALL_BUILD --config Release`
-
-IN `\GitHub\LightGBM\R-package` `lightgbm_2.0.5.tar.gz` is built.  This is the file you can use to install the lightGBM package in RStudio.
-
-
-```{r runOnce, echo=FALSE}
-library(devtools)
-#options(devtools.install.args = "--no-multiarch") # if you have 64-bit R only, you can skip this
-install_github("Microsoft/LightGBM", subdir = "R-package")
-```
-
 ```{r}
-library(lightgbm, quietly=TRUE)
+library(lightgbm)
 lgb.train = lgb.Dataset(as.matrix(train[, colnames(train) != "Class"]), label = train$Class)
 lgb.test = lgb.Dataset(as.matrix(test[, colnames(test) != "Class"]), label = test$Class)
 
